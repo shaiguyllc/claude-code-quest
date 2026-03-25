@@ -1,0 +1,2772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLAUDE CODE: THE TERMINAL QUEST</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #0d0d15;
+    --bg3: #111120;
+    --card: #0f0f1e;
+    --card2: #141428;
+    --border: #1a1a3a;
+    --green: #00ff88;
+    --green2: #00cc66;
+    --cyan: #00e5ff;
+    --cyan2: #00b8cc;
+    --purple: #b366ff;
+    --purple2: #8833cc;
+    --pink: #ff4dff;
+    --red: #ff3366;
+    --orange: #ff8c00;
+    --yellow: #ffd700;
+    --text: #c8d8e8;
+    --text2: #8899aa;
+    --text3: #556677;
+    --glow-green: 0 0 10px #00ff8844, 0 0 30px #00ff8822, 0 0 60px #00ff8811;
+    --glow-cyan: 0 0 10px #00e5ff44, 0 0 30px #00e5ff22;
+    --glow-purple: 0 0 10px #b366ff44, 0 0 30px #b366ff22;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    overflow-x: hidden;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+    animation: scanMove 8s linear infinite;
+  }
+
+  @keyframes scanMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  /* ── CRT VIGNETTE ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* ── STARS BG ── */
+  #stars {
+    position: fixed; inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .star {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: var(--cyan);
+    border-radius: 50%;
+    animation: twinkle var(--d, 3s) var(--delay, 0s) infinite;
+    opacity: 0.3;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.5); }
+  }
+
+  /* ── MAIN WRAPPER ── */
+  #app {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 16px 80px;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(180deg, var(--bg) 80%, transparent);
+    padding: 12px 0 8px;
+  }
+
+  .hud-inner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: 0 0 20px rgba(0,229,255,0.05);
+  }
+
+  .hud-level {
+    font-size: 11px;
+    color: var(--cyan);
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-shadow: var(--glow-cyan);
+  }
+
+  .xp-section {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .xp-label {
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    margin-bottom: 3px;
+  }
+
+  .xp-bar-outer {
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .xp-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green2), var(--green));
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 0 8px var(--green);
+    width: 0%;
+  }
+
+  .hud-lives {
+    display: flex;
+    gap: 3px;
+    font-size: 16px;
+  }
+
+  .heart {
+    transition: all 0.3s;
+    display: inline-block;
+  }
+  .heart.lost {
+    filter: grayscale(1) opacity(0.3);
+    transform: scale(0.8);
+  }
+
+  .hud-score {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--yellow);
+    white-space: nowrap;
+    text-shadow: 0 0 10px var(--yellow);
+  }
+
+  .hud-multiplier {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--purple);
+    white-space: nowrap;
+    text-shadow: var(--glow-purple);
+    background: rgba(179,102,255,0.1);
+    border: 1px solid rgba(179,102,255,0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+
+  /* ── SCREENS ── */
+  .screen {
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── TITLE SCREEN ── */
+  #screen-title {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    text-align: center;
+    padding: 40px 20px;
+  }
+  #screen-title.active {
+    display: flex;
+  }
+
+  .title-ascii {
+    font-size: clamp(8px, 1.5vw, 14px);
+    line-height: 1.2;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+    margin-bottom: 24px;
+    white-space: pre;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .title-main {
+    font-size: clamp(20px, 5vw, 40px);
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+    margin-bottom: 8px;
+  }
+
+  .title-sub {
+    font-size: clamp(10px, 2vw, 14px);
+    color: var(--purple);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+    text-shadow: var(--glow-purple);
+  }
+
+  .title-stats {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .title-stat {
+    text-align: center;
+  }
+
+  .title-stat-num {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+  }
+
+  .title-stat-label {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, var(--green2), var(--cyan));
+    color: var(--bg);
+    border: none;
+    padding: 16px 48px;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 0 20px rgba(0,255,136,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-start::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.2), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.5s;
+  }
+
+  .btn-start:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 40px rgba(0,255,136,0.5);
+  }
+
+  .btn-start:hover::before {
+    transform: translateX(100%);
+  }
+
+  .title-hint {
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 1px;
+  }
+
+  /* ── BRIEFING CARD ── */
+  .briefing-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin: 24px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .briefing-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--green), var(--cyan), var(--purple));
+  }
+
+  .layer-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  .briefing-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .briefing-title {
+    font-size: clamp(20px, 4vw, 32px);
+    font-weight: 800;
+    color: var(--cyan);
+    margin-bottom: 8px;
+    text-shadow: var(--glow-cyan);
+  }
+
+  .briefing-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 24px;
+    letter-spacing: 1px;
+  }
+
+  .briefing-facts {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .briefing-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.4s ease;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    line-height: 1.6;
+  }
+
+  .briefing-fact.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .fact-bullet {
+    color: var(--green);
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  code {
+    font-family: inherit;
+    background: rgba(0,229,255,0.1);
+    color: var(--cyan);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    border: 1px solid rgba(0,229,255,0.2);
+  }
+
+  /* ── CHALLENGE CARD ── */
+  .challenge-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin: 16px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .challenge-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--purple), var(--cyan));
+  }
+
+  .challenge-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .challenge-type {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--purple);
+    background: rgba(179,102,255,0.1);
+    border: 1px solid rgba(179,102,255,0.3);
+    border-radius: 3px;
+    padding: 3px 8px;
+  }
+
+  .challenge-xp {
+    font-size: 10px;
+    color: var(--yellow);
+    margin-left: auto;
+  }
+
+  .challenge-num {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1px;
+  }
+
+  .challenge-q {
+    font-size: clamp(14px, 2.5vw, 17px);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 22px;
+    line-height: 1.7;
+  }
+
+  /* MCQ Options */
+  .options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .option-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    min-height: 44px;
+    line-height: 1.5;
+  }
+
+  .option-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.05));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .option-btn:hover:not(:disabled) {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    transform: translateX(3px);
+    box-shadow: 0 0 15px rgba(0,229,255,0.1);
+  }
+
+  .option-btn:hover:not(:disabled)::before {
+    opacity: 1;
+  }
+
+  .option-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: var(--border);
+    color: var(--cyan);
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .option-btn:hover:not(:disabled) .option-letter {
+    background: var(--cyan);
+    color: var(--bg);
+  }
+
+  .option-btn.correct {
+    background: rgba(0,255,136,0.1);
+    border-color: var(--green);
+    color: var(--green);
+    animation: correctFlash 0.5s ease;
+  }
+
+  .option-btn.correct .option-letter {
+    background: var(--green);
+    color: var(--bg);
+  }
+
+  .option-btn.wrong {
+    background: rgba(255,51,102,0.1);
+    border-color: var(--red);
+    color: var(--red);
+    animation: wrongShake 0.5s ease;
+  }
+
+  .option-btn.wrong .option-letter {
+    background: var(--red);
+    color: white;
+  }
+
+  .option-btn.reveal-correct {
+    background: rgba(0,255,136,0.05);
+    border-color: rgba(0,255,136,0.4);
+    color: var(--green);
+  }
+
+  .option-btn:disabled {
+    cursor: default;
+  }
+
+  @keyframes correctFlash {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.02); background: rgba(0,255,136,0.3); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes wrongShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+
+  /* Fill-in Input */
+  .fill-container {
+    position: relative;
+    margin-bottom: 16px;
+  }
+
+  .terminal-prompt {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    gap: 10px;
+    font-size: 14px;
+    flex-wrap: wrap;
+    line-height: 1.8;
+  }
+
+  .terminal-prompt-prefix {
+    color: var(--green);
+    font-weight: 700;
+    white-space: pre;
+  }
+
+  .terminal-prompt-suffix {
+    color: var(--text);
+    white-space: pre;
+  }
+
+  .fill-input {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--cyan);
+    color: var(--cyan);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    width: 120px;
+    padding: 2px 4px;
+    text-align: center;
+    caret-color: var(--cyan);
+    animation: cursorBlink 1s step-end infinite;
+  }
+
+  @keyframes cursorBlink {
+    0%, 100% { border-bottom-color: var(--cyan); }
+    50% { border-bottom-color: transparent; }
+  }
+
+  .fill-input.correct-input {
+    border-bottom-color: var(--green);
+    color: var(--green);
+    animation: none;
+  }
+
+  .fill-input.wrong-input {
+    border-bottom-color: var(--red);
+    color: var(--red);
+    animation: wrongShake 0.5s ease;
+  }
+
+  .btn-submit {
+    background: linear-gradient(135deg, var(--purple2), var(--purple));
+    color: white;
+    border: none;
+    padding: 12px 28px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 44px;
+    text-transform: uppercase;
+  }
+
+  .btn-submit:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(179,102,255,0.4);
+  }
+
+  .btn-submit:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* Feedback Banner */
+  .feedback-banner {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    display: none;
+    animation: fadeIn 0.3s ease;
+    border-left: 3px solid;
+  }
+
+  .feedback-banner.show { display: block; }
+
+  .feedback-banner.correct-fb {
+    background: rgba(0,255,136,0.08);
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .feedback-banner.wrong-fb {
+    background: rgba(255,51,102,0.08);
+    border-color: var(--red);
+    color: #ff8099;
+  }
+
+  .feedback-icon {
+    font-size: 16px;
+    margin-right: 6px;
+  }
+
+  /* Floating XP text */
+  .xp-float {
+    position: fixed;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--yellow);
+    text-shadow: 0 0 10px var(--yellow);
+    pointer-events: none;
+    z-index: 9997;
+    animation: floatUp 1.2s ease forwards;
+  }
+
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
+  }
+
+  /* ── NEXT BUTTON ── */
+  .btn-next {
+    background: linear-gradient(135deg, var(--cyan2), var(--cyan));
+    color: var(--bg);
+    border: none;
+    padding: 14px 36px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 16px;
+    display: none;
+    min-height: 44px;
+    box-shadow: 0 0 15px rgba(0,229,255,0.2);
+  }
+
+  .btn-next.show {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .btn-next:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(0,229,255,0.4);
+  }
+
+  /* ── LEVEL COMPLETE SCREEN ── */
+  #screen-level-complete {
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .level-complete-ascii {
+    font-size: clamp(6px, 1.2vw, 11px);
+    line-height: 1.1;
+    white-space: pre;
+    margin-bottom: 24px;
+    animation: rainbowCycle 2s linear infinite;
+  }
+
+  @keyframes rainbowCycle {
+    0% { color: var(--green); text-shadow: 0 0 10px var(--green); }
+    33% { color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+    66% { color: var(--purple); text-shadow: 0 0 10px var(--purple); }
+    100% { color: var(--green); text-shadow: 0 0 10px var(--green); }
+  }
+
+  .level-complete-title {
+    font-size: clamp(22px, 5vw, 40px);
+    font-weight: 800;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+  }
+
+  .level-complete-subtitle {
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 32px;
+  }
+
+  .xp-gained {
+    font-size: clamp(32px, 6vw, 56px);
+    font-weight: 800;
+    color: var(--yellow);
+    text-shadow: 0 0 20px var(--yellow);
+    animation: xpPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    margin-bottom: 24px;
+  }
+
+  @keyframes xpPop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── ACHIEVEMENT TOAST ── */
+  #achievement-toast {
+    position: fixed;
+    bottom: 24px;
+    right: -400px;
+    background: var(--card2);
+    border: 1px solid var(--yellow);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 9996;
+    box-shadow: 0 0 30px rgba(255,215,0,0.2);
+    transition: right 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    min-width: 280px;
+  }
+
+  #achievement-toast.show {
+    right: 24px;
+  }
+
+  .achievement-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+
+  .achievement-label {
+    font-size: 9px;
+    color: var(--yellow);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  .achievement-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* ── BADGES DISPLAY ── */
+  .badges-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 24px 0;
+  }
+
+  .badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    min-width: 80px;
+    transition: all 0.3s;
+  }
+
+  .badge.earned {
+    border-color: var(--yellow);
+    background: rgba(255,215,0,0.05);
+    box-shadow: 0 0 15px rgba(255,215,0,0.1);
+  }
+
+  .badge-icon {
+    font-size: 24px;
+    filter: grayscale(1) opacity(0.3);
+    transition: all 0.3s;
+  }
+
+  .badge.earned .badge-icon {
+    filter: none;
+    animation: badgePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes badgePop {
+    from { transform: scale(0) rotate(-20deg); }
+    to { transform: scale(1) rotate(0deg); }
+  }
+
+  .badge-name {
+    font-size: 9px;
+    color: var(--text3);
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+
+  .badge.earned .badge-name {
+    color: var(--yellow);
+  }
+
+  /* ── FINAL SCREEN ── */
+  #screen-final {
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .final-rank {
+    font-size: clamp(14px, 3vw, 22px);
+    color: var(--purple);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-shadow: var(--glow-purple);
+  }
+
+  .final-title {
+    font-size: clamp(24px, 6vw, 48px);
+    font-weight: 800;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+    margin-bottom: 32px;
+  }
+
+  .final-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin: 32px 0;
+    text-align: center;
+  }
+
+  .final-stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 16px;
+  }
+
+  .final-stat-val {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+    margin-bottom: 6px;
+  }
+
+  .final-stat-label {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .certificate-box {
+    background: var(--card);
+    border: 1px solid var(--cyan);
+    border-radius: 12px;
+    padding: 28px;
+    margin: 24px 0;
+    position: relative;
+    box-shadow: 0 0 30px rgba(0,229,255,0.1);
+  }
+
+  .certificate-box::before,
+  .certificate-box::after {
+    content: '✦';
+    position: absolute;
+    font-size: 18px;
+    color: var(--cyan);
+  }
+  .certificate-box::before { top: 10px; left: 16px; }
+  .certificate-box::after { bottom: 10px; right: 16px; }
+
+  .cert-title {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.7;
+  }
+
+  .cert-name {
+    font-size: clamp(18px, 4vw, 28px);
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .cert-body {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.7;
+  }
+
+  .btn-share {
+    background: linear-gradient(135deg, #1a1a3a, #2a1a4a);
+    border: 1px solid var(--purple);
+    color: var(--purple);
+    padding: 14px 32px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 8px;
+    min-height: 44px;
+  }
+
+  .btn-share:hover {
+    background: rgba(179,102,255,0.15);
+    box-shadow: 0 0 20px rgba(179,102,255,0.3);
+    transform: translateY(-2px);
+  }
+
+  .btn-restart {
+    background: linear-gradient(135deg, var(--bg3), var(--card2));
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 14px 32px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 8px;
+    min-height: 44px;
+  }
+
+  .btn-restart:hover {
+    border-color: var(--text2);
+    color: var(--text);
+    transform: translateY(-2px);
+  }
+
+  /* ── PROGRESS DOTS ── */
+  .progress-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 20px 0;
+  }
+
+  .progress-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+
+  .progress-dot.done { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .progress-dot.active { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); animation: dotPulse 1s ease-in-out infinite; }
+
+  @keyframes dotPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+  }
+
+  /* ── DIVIDER ── */
+  .neon-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    margin: 24px 0;
+    opacity: 0.3;
+  }
+
+  /* ── COPIED TOOLTIP ── */
+  .copied-msg {
+    display: inline-block;
+    margin-left: 10px;
+    font-size: 12px;
+    color: var(--green);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .copied-msg.show {
+    opacity: 1;
+  }
+
+  /* ── PARTICLE BURST ── */
+  .particle {
+    position: fixed;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9995;
+    animation: particleFly var(--dur, 0.8s) ease forwards;
+  }
+
+  @keyframes particleFly {
+    0% { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); }
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 600px) {
+    #app { padding: 0 10px 60px; }
+    .briefing-card, .challenge-card { padding: 20px 16px; }
+    .hud-inner { gap: 8px; }
+    .title-stats { gap: 20px; }
+    .final-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── ENHANCED MOBILE: 768px ── */
+  @media (max-width: 768px) {
+    /* App container */
+    #app { padding: 0 12px 60px; }
+
+    /* HUD: 2x2 grid on narrow screens */
+    .hud-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 6px;
+      padding: 10px 12px;
+      align-items: center;
+    }
+
+    .hud-level {
+      font-size: 10px;
+      letter-spacing: 1px;
+      grid-column: 1 / -1;
+    }
+
+    .xp-section {
+      grid-column: 1 / -1;
+      min-width: 0;
+    }
+
+    .xp-label { font-size: 8px; }
+
+    .hud-lives { font-size: 14px; gap: 2px; }
+
+    .hud-score { font-size: 12px; text-align: right; }
+
+    .hud-multiplier { font-size: 10px; justify-self: end; }
+
+    /* Level map nodes — smaller on mobile */
+    .level-circle {
+      width: 28px; height: 28px;
+      font-size: 11px;
+      margin: 0 12px;
+    }
+
+    .level-node:not(:last-child)::after {
+      right: -12px;
+      width: 24px;
+      top: 14px;
+    }
+
+    .level-node-label {
+      font-size: 7px;
+      max-width: 48px;
+    }
+
+    /* Terminal block */
+    .terminal-block {
+      font-size: 11px;
+      padding: 12px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    /* Briefing card */
+    .briefing-card {
+      padding: 20px 14px;
+    }
+
+    .briefing-icon { font-size: 36px; }
+
+    .briefing-title { font-size: clamp(16px, 4vw, 24px); }
+
+    .briefing-subtitle { font-size: 11px; }
+
+    .briefing-fact {
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+
+    /* Challenge card */
+    .challenge-card {
+      padding: 18px 14px;
+    }
+
+    .challenge-q {
+      font-size: clamp(13px, 3vw, 15px);
+      margin-bottom: 16px;
+    }
+
+    /* Option buttons — smaller and wrap */
+    .option-btn {
+      font-size: 12px;
+      padding: 12px 14px;
+      min-height: 40px;
+    }
+
+    .option-letter {
+      width: 20px; height: 20px;
+      font-size: 10px;
+    }
+
+    /* Terminal prompt / fill input */
+    .terminal-prompt {
+      font-size: 12px;
+      padding: 10px 12px;
+    }
+
+    .fill-input {
+      font-size: 12px;
+      width: 100px;
+    }
+
+    /* Submit & next buttons */
+    .btn-submit {
+      padding: 10px 20px;
+      font-size: 12px;
+      width: 100%;
+    }
+
+    .btn-next {
+      padding: 12px 24px;
+      font-size: 13px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* Start button */
+    .btn-start {
+      padding: 14px 36px;
+      font-size: 14px;
+      letter-spacing: 2px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    /* Share / restart buttons */
+    .btn-share, .btn-restart {
+      padding: 12px 20px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      width: 100%;
+      margin: 4px 0;
+    }
+
+    /* Stats panels on final screen */
+    .final-stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .final-stat-val { font-size: 22px; }
+
+    /* Achievement toast — fits screen */
+    #achievement-toast {
+      right: -400px;
+      bottom: 16px;
+      min-width: 0;
+      width: calc(100vw - 32px);
+      left: 16px;
+      right: auto;
+      transition: left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s;
+      opacity: 0;
+    }
+
+    #achievement-toast.show {
+      left: 16px;
+      right: auto;
+      opacity: 1;
+    }
+
+    .achievement-icon { font-size: 22px; }
+    .achievement-name { font-size: 13px; }
+
+    /* XP float text */
+    .xp-float { font-size: 16px; }
+
+    /* Feedback banner */
+    .feedback-banner {
+      font-size: 12px;
+      padding: 10px 14px;
+    }
+
+    /* Certificate box */
+    .certificate-box { padding: 20px 16px; }
+
+    /* Badges */
+    .badge { min-width: 64px; padding: 10px 10px; }
+    .badge-icon { font-size: 20px; }
+    .badge-name { font-size: 8px; }
+
+    /* Title screen */
+    #screen-title { padding: 24px 16px; }
+    .title-stats { gap: 16px; }
+    .title-stat-num { font-size: 22px; }
+    .title-stat-label { font-size: 9px; }
+    .title-hint { font-size: 10px; }
+  }
+
+  /* ── EXTRA SMALL: 400px ── */
+  @media (max-width: 400px) {
+    .hud-level { font-size: 9px; letter-spacing: 0.5px; }
+    .level-circle { width: 24px; height: 24px; font-size: 10px; margin: 0 8px; }
+    .level-node:not(:last-child)::after { right: -8px; width: 16px; }
+    .level-node-label { font-size: 6px; max-width: 36px; }
+    .terminal-block { font-size: 10px; }
+    .option-btn { font-size: 11px; padding: 10px 10px; }
+    .challenge-q { font-size: 12px; }
+    .briefing-fact { font-size: 11px; }
+    .final-stat-val { font-size: 20px; }
+    .badge { min-width: 56px; }
+  }
+
+  /* ── TYPEWRITER ── */
+  .typewriter { border-right: 2px solid var(--cyan); padding-right: 2px; animation: cursorBlink2 0.8s step-end infinite; }
+  @keyframes cursorBlink2 {
+    0%, 100% { border-color: var(--cyan); }
+    50% { border-color: transparent; }
+  }
+
+  /* ── HEART PULSE ── */
+  @keyframes heartPulse {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.4); }
+    50% { transform: scale(0.8); }
+    75% { transform: scale(1.2); }
+  }
+
+  .heart.pulse {
+    animation: heartPulse 0.4s ease;
+  }
+
+  /* ── LEVEL MAP ── */
+  .level-map {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: 20px 0;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .level-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+
+  .level-node:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 18px;
+    right: -20px;
+    width: 40px;
+    height: 2px;
+    background: var(--border);
+  }
+
+  .level-node.done::after { background: var(--green); }
+
+  .level-circle {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text3);
+    margin: 0 20px;
+    transition: all 0.3s;
+    background: var(--bg3);
+  }
+
+  .level-node.done .level-circle {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(0,255,136,0.1);
+    box-shadow: 0 0 10px rgba(0,255,136,0.2);
+  }
+
+  .level-node.current .level-circle {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0,229,255,0.1);
+    box-shadow: 0 0 10px rgba(0,229,255,0.3);
+    animation: dotPulse 1s ease-in-out infinite;
+  }
+
+  .level-node-label {
+    font-size: 8px;
+    color: var(--text3);
+    margin-top: 4px;
+    letter-spacing: 1px;
+    text-align: center;
+    max-width: 60px;
+  }
+
+  .level-node.done .level-node-label { color: var(--green); }
+  .level-node.current .level-node-label { color: var(--cyan); }
+
+  /* ── STREAK DISPLAY ── */
+  .streak-banner {
+    display: none;
+    text-align: center;
+    margin: 8px 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--orange);
+    text-shadow: 0 0 10px var(--orange);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .streak-banner.show { display: block; }
+
+  /* ── TERMINAL LINES ── */
+  .terminal-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .t-prompt { color: var(--green); }
+  .t-cmd { color: var(--cyan); }
+  .t-output { color: var(--text2); }
+  .t-comment { color: var(--text3); font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- Stars background -->
+<div id="stars"></div>
+
+<!-- Achievement Toast -->
+<div id="achievement-toast">
+  <span class="achievement-icon" id="achievement-icon">🏆</span>
+  <div>
+    <div class="achievement-label">Achievement Unlocked</div>
+    <div class="achievement-name" id="achievement-name">First Blood</div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+
+  <!-- HUD -->
+  <div id="hud" style="display:none">
+    <div class="hud-inner">
+      <span class="hud-level" id="hud-level">L1 · FOUNDATION</span>
+      <div class="xp-section">
+        <div class="xp-label">XP ── <span id="xp-current">0</span> / <span id="xp-max">700</span></div>
+        <div class="xp-bar-outer"><div class="xp-bar-inner" id="xp-bar"></div></div>
+      </div>
+      <div class="hud-lives" id="hud-lives">
+        <span class="heart" id="heart-1">❤️</span>
+        <span class="heart" id="heart-2">❤️</span>
+        <span class="heart" id="heart-3">❤️</span>
+      </div>
+      <div class="hud-score">⬡ <span id="hud-score">0</span></div>
+      <div class="hud-multiplier" id="hud-multiplier">×1</div>
+    </div>
+  </div>
+
+  <!-- TITLE SCREEN -->
+  <div class="screen active" id="screen-title">
+    <div class="title-ascii" id="title-ascii"></div>
+    <div class="title-main">CLAUDE CODE</div>
+    <div class="title-sub">The Terminal Quest</div>
+    <div class="title-stats">
+      <div class="title-stat">
+        <div class="title-stat-num">7</div>
+        <div class="title-stat-label">Layers</div>
+      </div>
+      <div class="title-stat">
+        <div class="title-stat-num">21</div>
+        <div class="title-stat-label">Challenges</div>
+      </div>
+      <div class="title-stat">
+        <div class="title-stat-num">700</div>
+        <div class="title-stat-label">Max XP</div>
+      </div>
+      <div class="title-stat">
+        <div class="title-stat-num">8</div>
+        <div class="title-stat-label">Ranks</div>
+      </div>
+    </div>
+    <button class="btn-start" onclick="startGame()">▶ BOOT TERMINAL</button>
+    <div class="title-hint" id="save-hint"></div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="screen" id="screen-game">
+    <div id="game-content"></div>
+  </div>
+
+  <!-- LEVEL COMPLETE SCREEN -->
+  <div class="screen" id="screen-level-complete">
+    <div class="level-complete-ascii" id="lc-ascii"></div>
+    <div class="level-complete-title" id="lc-title">LAYER COMPLETE</div>
+    <div class="level-complete-subtitle" id="lc-sub"></div>
+    <div class="xp-gained" id="lc-xp">+100 XP</div>
+    <div class="badges-row" id="lc-badges"></div>
+    <button class="btn-start" id="btn-continue" onclick="continueGame()">CONTINUE ▶</button>
+  </div>
+
+  <!-- FINAL SCREEN -->
+  <div class="screen" id="screen-final">
+    <div id="final-content"></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  GAME DATA
+// ═══════════════════════════════════════════════════════
+
+const LEVELS = [
+  {
+    id: 1,
+    name: 'Foundation',
+    icon: '⚡',
+    color: 'var(--green)',
+    subtitle: 'Installing & Starting Claude Code',
+    facts: [
+      'Install on Mac: <code>brew install claude-code</code> · Windows: WinGet · Note: auto-updates are <strong style="color:var(--red)">NOT</strong> enabled',
+      'Always navigate to your project folder first, then run <code>claude</code> to start',
+      'Claude Code reads your folder and takes real actions — reads files, writes code, runs tests, commits'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'What command starts Claude Code?',
+        options: ['claude start', 'claude', 'claude-code run', 'cc'],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Exactly! Just <code>claude</code> — short and simple. Make sure you\'re in your project folder first.',
+          wrong: 'Not quite. The command is simply <code>claude</code>. No subcommands needed!'
+        }
+      },
+      {
+        type: 'fill',
+        typeLabel: 'Fill in the Command',
+        question: 'To upgrade Claude Code on Mac using Homebrew, you type:',
+        prefix: '$ brew ',
+        suffix: ' claude-code',
+        answer: 'upgrade',
+        xp: 25,
+        feedback: {
+          correct: 'Correct! <code>brew upgrade claude-code</code> — Homebrew doesn\'t auto-update, so run this manually.',
+          wrong: 'The correct answer is <code>upgrade</code>. Remember: Homebrew won\'t auto-update Claude Code!'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Scenario',
+        question: 'You just installed Claude Code and opened your terminal. What\'s the FIRST thing you should do before running <code>claude</code>?',
+        options: [
+          'Run <code>claude</code> from anywhere — it finds your project',
+          'Navigate to your project folder first',
+          'Create a CLAUDE.md file',
+          'Install MCP servers'
+        ],
+        answer: 1,
+        xp: 50,
+        feedback: {
+          correct: 'Yes! Always <code>cd</code> into your project folder first. Claude Code uses your current directory as context.',
+          wrong: 'You should navigate to your project folder first! Claude Code reads the current directory for context.'
+        }
+      }
+    ]
+  },
+  {
+    id: 2,
+    name: 'Core Workflows',
+    icon: '⚙️',
+    color: 'var(--cyan)',
+    subtitle: 'What Claude Code Actually Does',
+    facts: [
+      'Edit files conversationally: say <em>"add input validation to login function in auth.py"</em> — it finds, reads, edits, shows diff',
+      'Git superpowers: stages, writes commit messages, creates branches, opens PRs — just describe what you want',
+      'Paste errors or describe symptoms → Claude traces the codebase, finds root cause, and fixes it'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'You have an error in your code. What\'s the BEST way to debug with Claude Code?',
+        options: [
+          'Paste the full error message and describe the symptom',
+          'Just say "fix it" and let Claude figure it out',
+          'Manually search Stack Overflow first',
+          'Restart the server and see if it goes away'
+        ],
+        answer: 0,
+        xp: 25,
+        feedback: {
+          correct: 'Perfect! Paste the full error — Claude Code traces the codebase, finds the root cause, and fixes it.',
+          wrong: 'Always give Claude the full error message. More context = better debugging!'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Scenario',
+        question: 'Which of these is something Claude Code can <strong style="color:var(--red)">NOT</strong> do natively?',
+        options: [
+          'Write descriptive commit messages automatically',
+          'Fix ESLint / linting errors',
+          'Deploy directly to production servers',
+          'Create pull requests'
+        ],
+        answer: 2,
+        xp: 50,
+        feedback: {
+          correct: 'Correct! Claude Code can\'t deploy to production on its own — that requires infrastructure access and human approval.',
+          wrong: 'Claude Code can write commits, fix lint, and create PRs — but it can\'t deploy to production servers natively.'
+        }
+      },
+      {
+        type: 'fill',
+        typeLabel: 'Fill in the Blank',
+        question: 'Instead of writing a commit message yourself, you tell Claude Code:',
+        prefix: '"',
+        suffix: ' these changes with a descriptive message"',
+        answer: 'commit',
+        xp: 25,
+        feedback: {
+          correct: 'Right! "commit these changes with a descriptive message" — Claude Code handles the git workflow for you.',
+          wrong: 'The word is <code>commit</code>. "Commit these changes with a descriptive message" — Claude writes the message!'
+        }
+      }
+    ]
+  },
+  {
+    id: 3,
+    name: 'Slash Commands',
+    icon: '⌨️',
+    color: 'var(--purple)',
+    subtitle: 'Controls & Checkpoints',
+    facts: [
+      '<code>/clear</code> wipes context for fresh start · <code>/compact</code> compresses history to save context space · <code>/memory</code> views project memory',
+      'Checkpoints: auto-generated per prompt, 30-day retention — restore with <strong>Esc × 2</strong> or <code>/rewind</code>',
+      '3 restore modes when rewinding: chat history only, code changes only, or both together'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'You\'ve been working on a complex feature for hours and want to switch to a completely different task. Which slash command should you use?',
+        options: ['/compact', '/clear', '/memory', '/rewind'],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Yes! <code>/clear</code> wipes the context and gives you a completely fresh start — perfect for switching tasks.',
+          wrong: '<code>/clear</code> is what you want — it wipes the context entirely for a fresh start.'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'What does pressing <strong>Esc twice</strong> do in Claude Code?',
+        options: [
+          'Exits the program completely',
+          'Opens the checkpoint restore menu',
+          'Clears the current input line',
+          'Cancels the current operation'
+        ],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Correct! Esc × 2 opens the checkpoint restore menu — where you can roll back chat, code, or both.',
+          wrong: 'Esc × 2 opens the checkpoint/restore menu. You can restore chat history, code changes, or both!'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Scenario',
+        question: 'Your context window is getting full but you don\'t want to lose your conversation history. Which command helps?',
+        options: ['/clear', '/compact', '/memory', '/bug'],
+        answer: 1,
+        xp: 50,
+        feedback: {
+          correct: 'Exactly! <code>/compact</code> compresses history intelligently — saves context space without losing the thread.',
+          wrong: '<code>/compact</code> compresses your conversation history to save context space, unlike <code>/clear</code> which deletes it.'
+        }
+      }
+    ]
+  },
+  {
+    id: 4,
+    name: 'CLAUDE.md & Memory',
+    icon: '📋',
+    color: 'var(--yellow)',
+    subtitle: 'Teaching Claude Your Project',
+    facts: [
+      'Place <code>CLAUDE.md</code> in the project root — it\'s read automatically every time Claude Code starts in that folder',
+      'Include: coding conventions, architecture notes, workflow rules, forbidden patterns, and key file locations',
+      'Example: <em>"use snake_case for variables"</em>, <em>"auth module in /src/auth — never import from /internal"</em>'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'Where should you place the <code>CLAUDE.md</code> file?',
+        options: [
+          'In your home directory (~)',
+          'In the project root folder',
+          'In a hidden .claude/ folder',
+          'Anywhere — Claude finds it automatically'
+        ],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Correct! Project root is the right place — Claude Code reads it on every startup in that directory.',
+          wrong: 'CLAUDE.md belongs in the project root folder. That\'s where Claude Code looks for it on startup.'
+        }
+      },
+      {
+        type: 'fill',
+        typeLabel: 'Fill in the Blank',
+        question: 'CLAUDE.md is read by Claude Code every time it _____ in that project.',
+        prefix: 'Claude reads CLAUDE.md every time it ',
+        suffix: ' in that project.',
+        answer: 'starts',
+        xp: 25,
+        feedback: {
+          correct: 'Right! Every startup, Claude Code reads CLAUDE.md — making it a persistent source of project context.',
+          wrong: 'The answer is <code>starts</code>. Every time Claude Code starts in that project, it reads CLAUDE.md.'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Scenario',
+        question: 'You\'re onboarding Claude Code to a new project. Which of these is MOST valuable to put in CLAUDE.md?',
+        options: [
+          'Your name and job title',
+          'Architecture notes and coding conventions',
+          'A list of bugs to fix',
+          'Your API keys and secrets'
+        ],
+        answer: 1,
+        xp: 50,
+        feedback: {
+          correct: 'Exactly! Architecture notes + conventions = dramatically more consistent and accurate assistance.',
+          wrong: 'Architecture notes and coding conventions are the gold standard for CLAUDE.md — they improve every interaction.'
+        }
+      }
+    ]
+  },
+  {
+    id: 5,
+    name: 'Automation',
+    icon: '🤖',
+    color: 'var(--cyan)',
+    subtitle: 'Agentic & Headless Workflows',
+    facts: [
+      'Headless mode: use <code>--print</code> or <code>-p</code> flags to run without human interaction — perfect for scripts and CI/CD',
+      'GitHub Actions / GitLab CI: set up automated PR review, issue triage, and labeling without any manual work',
+      'Run parallel agents simultaneously on independent workstreams — even on repos without a local clone'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'Which flag enables Claude Code to run without a human in the loop (headless/non-interactive mode)?',
+        options: ['--silent', '--print', '--auto', '--headless'],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Correct! <code>--print</code> (or <code>-p</code>) enables headless mode — no prompts, just output. Perfect for pipelines.',
+          wrong: 'The flag is <code>--print</code> (also <code>-p</code>). It makes Claude Code run non-interactively.'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Scenario',
+        question: 'You want Claude Code to automatically review every pull request in your GitHub repo. What do you set up?',
+        options: [
+          'A cron job running on your laptop',
+          'A GitHub Actions workflow',
+          'A CLAUDE.md rule about reviewing',
+          'An MCP server connection'
+        ],
+        answer: 1,
+        xp: 50,
+        feedback: {
+          correct: 'Yes! GitHub Actions runs Claude Code with <code>--print</code> on every PR event — fully automated review.',
+          wrong: 'A GitHub Actions workflow is the answer — it triggers Claude Code automatically on every PR, no laptop needed.'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'What\'s the key benefit of running parallel Claude Code agents?',
+        options: [
+          'Cheaper API costs per task',
+          'Independent workstreams run simultaneously',
+          'Faster completion of a single task',
+          'Automatically better code quality'
+        ],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Exactly! Parallel agents mean multiple independent tasks run at the same time — multiplying your throughput.',
+          wrong: 'The main benefit is that independent workstreams can run simultaneously — true parallelism for your work.'
+        }
+      }
+    ]
+  },
+  {
+    id: 6,
+    name: 'MCP & Integrations',
+    icon: '🔌',
+    color: 'var(--purple)',
+    subtitle: 'Connecting Claude to Your World',
+    facts: [
+      'MCP = Model Context Protocol — an open standard for connecting AI assistants to external tools, databases, and services',
+      'Connect Claude Code to: databases, internal APIs, monitoring tools, custom services — anything with an MCP adapter',
+      'Example: with a database MCP, say <em>"look at the users table, write a migration to add email_verified column"</em>'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'What does <strong>MCP</strong> stand for?',
+        options: [
+          'Multi-Claude Protocol',
+          'Model Context Protocol',
+          'Machine Code Pipeline',
+          'Modular Compute Platform'
+        ],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Correct! Model Context Protocol — the open standard that lets Claude connect to external tools and data sources.',
+          wrong: 'MCP stands for <strong>Model Context Protocol</strong> — the open standard for AI tool integrations.'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Scenario',
+        question: 'You want Claude Code to query your PostgreSQL database directly. What do you need?',
+        options: [
+          'Export the DB to CSV and paste it into the chat',
+          'Set up an MCP server for your database',
+          'Write a custom script to dump the data first',
+          'Use the /database slash command'
+        ],
+        answer: 1,
+        xp: 50,
+        feedback: {
+          correct: 'Yes! An MCP server bridges Claude Code to your database — then you query it conversationally.',
+          wrong: 'You need to set up an MCP server for your database. Then Claude can query it directly in conversation.'
+        }
+      },
+      {
+        type: 'fill',
+        typeLabel: 'Fill in the Command',
+        question: 'To manage MCP server connections inside Claude Code, you use the slash command:',
+        prefix: 'Type the command: ',
+        suffix: '',
+        answer: '/mcp',
+        xp: 25,
+        feedback: {
+          correct: 'Right! <code>/mcp</code> is your MCP management hub — add, remove, and inspect server connections.',
+          wrong: 'The answer is <code>/mcp</code> — the slash command for managing all your MCP server connections.'
+        }
+      }
+    ]
+  },
+  {
+    id: 7,
+    name: 'Power User',
+    icon: '🚀',
+    color: 'var(--pink)',
+    subtitle: 'Combining All Layers for Maximum Leverage',
+    facts: [
+      'Combining all layers = maximum leverage: rich CLAUDE.md + headless automation + CI/CD pipelines + parallel agents + MCP',
+      'Each layer multiplies the others — a comprehensive CLAUDE.md makes every automated run smarter',
+      'Power users treat Claude Code as infrastructure, not just a tool'
+    ],
+    challenges: [
+      {
+        type: 'mcq',
+        typeLabel: 'Power Scenario',
+        question: 'You\'re a power user who wants Claude Code to: (1) automatically review PRs, (2) query your database directly, and (3) follow your team\'s coding rules consistently. Which combination covers all three?',
+        options: [
+          'GitHub Actions + MCP + CLAUDE.md',
+          '--print flag + /clear + /compact',
+          'Headless mode + /memory + /bug',
+          'brew upgrade + checkpoints + /rewind'
+        ],
+        answer: 0,
+        xp: 50,
+        feedback: {
+          correct: 'Perfect! GitHub Actions (automated PRs) + MCP (database) + CLAUDE.md (consistency) = the power user trifecta.',
+          wrong: 'The answer is GitHub Actions + MCP + CLAUDE.md. Each solves one requirement: automation + database + conventions.'
+        }
+      },
+      {
+        type: 'mcq',
+        typeLabel: 'Multiple Choice',
+        question: 'What\'s the highest-leverage single investment you can make to improve Claude Code\'s consistency on your project?',
+        options: [
+          'Always installing the latest version first',
+          'Writing a comprehensive CLAUDE.md file',
+          'Using more slash commands daily',
+          'Running more parallel agents at once'
+        ],
+        answer: 1,
+        xp: 25,
+        feedback: {
+          correct: 'Yes! A comprehensive CLAUDE.md is the highest-leverage investment — it improves every single interaction.',
+          wrong: 'A comprehensive CLAUDE.md is the highest-leverage move — it shapes every conversation and automation run.'
+        }
+      },
+      {
+        type: 'fill',
+        typeLabel: 'Final Challenge — TYPE IT',
+        question: 'You\'ve mastered all 7 layers. Now prove it — type the command that starts it all:',
+        prefix: '~/my-project $ ',
+        suffix: '',
+        answer: 'claude',
+        xp: 50,
+        feedback: {
+          correct: '🎉 You\'ve done it! <code>claude</code> — the one command that unlocks everything you\'ve learned.',
+          wrong: 'So close! The answer is simply <code>claude</code>. Navigate to your project folder, then run it.'
+        }
+      }
+    ]
+  }
+];
+
+const ACHIEVEMENTS = [
+  { id: 'first_blood', name: 'First Blood', icon: '🩸', desc: 'Answer your first question correctly' },
+  { id: 'streak_3', name: 'On Fire', icon: '🔥', desc: 'Get a 3× streak' },
+  { id: 'streak_5', name: 'Unstoppable', icon: '⚡', desc: 'Get a 5× streak' },
+  { id: 'no_mistakes_l1', name: 'Perfect Start', icon: '💎', desc: 'Complete Layer 1 with no mistakes' },
+  { id: 'halfway', name: 'Midpoint', icon: '🌟', desc: 'Complete Layer 4' },
+  { id: 'layer7', name: 'Layer 7 Complete', icon: '🚀', desc: 'Complete the final layer' },
+  { id: 'all_correct', name: 'Flawless Victory', icon: '🏆', desc: 'Complete the entire game without mistakes' },
+  { id: 'speed_demon', name: 'Streak Master', icon: '⚡', desc: 'Maintain 5+ streak' }
+];
+
+const RANKS = [
+  { min: 0, name: 'Novice', color: 'var(--text3)' },
+  { min: 100, name: 'Apprentice', color: 'var(--text2)' },
+  { min: 200, name: 'Developer', color: 'var(--green)' },
+  { min: 300, name: 'Senior', color: 'var(--cyan)' },
+  { min: 450, name: 'Principal', color: 'var(--purple)' },
+  { min: 550, name: 'Staff', color: 'var(--pink)' },
+  { min: 625, name: 'Distinguished', color: 'var(--yellow)' },
+  { min: 680, name: 'Fellow', color: 'var(--orange)' }
+];
+
+const LEVEL_COMPLETE_ASCII = [
+  `
+ ██████╗ ██████╗ ███╗   ███╗██████╗ ██╗     ███████╗████████╗███████╗██╗
+██╔════╝██╔═══██╗████╗ ████║██╔══██╗██║     ██╔════╝╚══██╔══╝██╔════╝██║
+██║     ██║   ██║██╔████╔██║██████╔╝██║     █████╗     ██║   █████╗  ██║
+██║     ██║   ██║██║╚██╔╝██║██╔═══╝ ██║     ██╔══╝     ██║   ██╔══╝  ╚═╝
+╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ███████╗███████╗   ██║   ███████╗██╗
+ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚══════╝╚══════╝   ╚═╝   ╚══════╝╚═╝`,
+  `
+██╗      █████╗ ██╗   ██╗███████╗██████╗      ██╗
+██║     ██╔══██╗╚██╗ ██╔╝██╔════╝██╔══██╗     ██║
+██║     ███████║ ╚████╔╝ █████╗  ██████╔╝     ██║
+██║     ██╔══██║  ╚██╔╝  ██╔══╝  ██╔══██╗     ╚═╝
+███████╗██║  ██║   ██║   ███████╗██║  ██║     ██╗
+╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝     ╚═╝`,
+  `
+██████╗  ██████╗ ███╗   ██╗███████╗██╗
+╚════██╗██╔═══██╗████╗  ██║██╔════╝██║
+ █████╔╝██║   ██║██╔██╗ ██║█████╗  ██║
+ ╚═══██╗██║   ██║██║╚██╗██║██╔══╝  ╚═╝
+██████╔╝╚██████╔╝██║ ╚████║███████╗██╗
+╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝╚═╝`
+];
+
+const FINAL_ASCII = `
+ ██████╗ ██╗   ██╗███████╗███████╗████████╗
+██╔═══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝
+██║   ██║██║   ██║█████╗  ███████╗   ██║
+██║▄▄ ██║██║   ██║██╔══╝  ╚════██║   ██║
+╚██████╔╝╚██████╔╝███████╗███████║   ██║
+ ╚══▀▀═╝  ╚═════╝ ╚══════╝╚══════╝   ╚═╝
+ ██████╗ ██████╗ ███╗   ███╗██████╗ ██╗     ███████╗████████╗███████╗██╗
+██╔════╝██╔═══██╗████╗ ████║██╔══██╗██║     ██╔════╝╚══██╔══╝██╔════╝██║
+██║     ██║   ██║██╔████╔██║██████╔╝██║     █████╗     ██║   █████╗  ██║
+██║     ██║   ██║██║╚██╔╝██║██╔═══╝ ██║     ██╔══╝     ██║   ██╔══╝  ╚═╝
+╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ███████╗███████╗   ██║   ███████╗██╗
+ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚══════╝╚══════╝   ╚═╝   ╚══════╝╚═╝`;
+
+// ═══════════════════════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════════════════════
+
+let state = {
+  currentLevel: 0,       // 0-indexed
+  currentChallenge: 0,
+  xp: 0,
+  score: 0,
+  lives: 3,
+  streak: 0,
+  multiplier: 1,
+  totalCorrect: 0,
+  totalWrong: 0,
+  livesLostThisLevel: 0,
+  achievements: new Set(),
+  levelXp: [],           // xp per level
+  active: false
+};
+
+const MAX_XP = 700;
+
+function saveState() {
+  try {
+    localStorage.setItem('ccgame_state', JSON.stringify({
+      ...state,
+      achievements: [...state.achievements]
+    }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const s = localStorage.getItem('ccgame_state');
+    if (s) {
+      const loaded = JSON.parse(s);
+      if (loaded.active) {
+        loaded.achievements = new Set(loaded.achievements);
+        Object.assign(state, loaded);
+        return true;
+      }
+    }
+  } catch(e) {}
+  return false;
+}
+
+function clearState() {
+  localStorage.removeItem('ccgame_state');
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+
+function init() {
+  generateStars();
+  renderTitleAscii();
+  const hasSave = loadState();
+  if (hasSave) {
+    document.getElementById('save-hint').textContent =
+      `▸ Progress saved — Level ${state.currentLevel + 1} · ${state.xp} XP`;
+  }
+}
+
+function generateStars() {
+  const container = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.cssText = `
+      left: ${Math.random() * 100}%;
+      top: ${Math.random() * 100}%;
+      --d: ${2 + Math.random() * 4}s;
+      --delay: ${Math.random() * 4}s;
+    `;
+    container.appendChild(star);
+  }
+}
+
+function renderTitleAscii() {
+  const art = `
+   ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
+  ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝
+  ██║     ██║     ███████║██║   ██║██║  ██║█████╗
+  ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝
+  ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗
+   ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝╚══════╝
+    ██████╗ ██████╗ ██████╗ ███████╗
+   ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+   ██║     ██║   ██║██║  ██║█████╗
+   ██║     ██║   ██║██║  ██║██╔══╝
+   ╚██████╗╚██████╔╝██████╔╝███████╗
+    ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝`;
+  document.getElementById('title-ascii').textContent = art;
+}
+
+// ═══════════════════════════════════════════════════════
+//  GAME FLOW
+// ═══════════════════════════════════════════════════════
+
+function startGame() {
+  if (!state.active) {
+    resetState();
+  }
+  document.getElementById('hud').style.display = 'block';
+  showScreen('screen-game');
+  updateHUD();
+  showBriefing(state.currentLevel);
+}
+
+function resetState() {
+  state = {
+    currentLevel: 0,
+    currentChallenge: 0,
+    xp: 0,
+    score: 0,
+    lives: 3,
+    streak: 0,
+    multiplier: 1,
+    totalCorrect: 0,
+    totalWrong: 0,
+    livesLostThisLevel: 0,
+    achievements: new Set(),
+    levelXp: [],
+    active: true
+  };
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  el.classList.add('active');
+  el.scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
+// ── BRIEFING ──
+
+function showBriefing(levelIdx) {
+  state.currentChallenge = 0;
+  state.livesLostThisLevel = 0;
+  const level = LEVELS[levelIdx];
+
+  updateHUDLevel(level);
+  updateHearts();
+
+  const content = document.getElementById('game-content');
+  content.innerHTML = '';
+
+  // Level map
+  content.appendChild(makeLevelMap(levelIdx));
+
+  // Briefing card
+  const card = document.createElement('div');
+  card.className = 'briefing-card';
+  card.innerHTML = `
+    <div class="layer-badge">
+      <span>${level.icon}</span>
+      LAYER ${level.id} OF 7
+    </div>
+    <span class="briefing-icon">${level.icon}</span>
+    <div class="briefing-title">${level.name.toUpperCase()}</div>
+    <div class="briefing-subtitle">${level.subtitle}</div>
+    <ul class="briefing-facts" id="facts-list">
+      ${level.facts.map((f, i) => `
+        <li class="briefing-fact" id="fact-${i}">
+          <span class="fact-bullet">▸</span>
+          <span>${f}</span>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+  content.appendChild(card);
+
+  // Progress dots for challenges
+  const dots = document.createElement('div');
+  dots.className = 'progress-dots';
+  level.challenges.forEach((_, i) => {
+    dots.innerHTML += `<div class="progress-dot active" id="pdot-${i}"></div>`;
+  });
+  content.appendChild(dots);
+
+  // Start button
+  const btnWrap = document.createElement('div');
+  btnWrap.style.textAlign = 'center';
+  const btn = document.createElement('button');
+  btn.className = 'btn-next show';
+  btn.innerHTML = 'START CHALLENGES ▶';
+  btn.onclick = () => showChallenge(levelIdx, 0);
+  btnWrap.appendChild(btn);
+  content.appendChild(btnWrap);
+
+  // Animate facts
+  setTimeout(() => animateFacts(level.facts.length), 200);
+}
+
+function animateFacts(count) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const el = document.getElementById(`fact-${i}`);
+      if (el) el.classList.add('visible');
+    }, i * 350);
+  }
+}
+
+function makeLevelMap(currentIdx) {
+  const div = document.createElement('div');
+  div.className = 'level-map';
+  LEVELS.forEach((lv, i) => {
+    const node = document.createElement('div');
+    node.className = 'level-node' + (i < currentIdx ? ' done' : i === currentIdx ? ' current' : '');
+    node.innerHTML = `
+      <div class="level-circle">${i < currentIdx ? '✓' : lv.id}</div>
+      <div class="level-node-label">${lv.name}</div>
+    `;
+    div.appendChild(node);
+  });
+  return div;
+}
+
+// ── CHALLENGE ──
+
+function showChallenge(levelIdx, challengeIdx) {
+  const level = LEVELS[levelIdx];
+  const challenge = level.challenges[challengeIdx];
+  const content = document.getElementById('game-content');
+  content.innerHTML = '';
+
+  content.appendChild(makeLevelMap(levelIdx));
+
+  // Progress dots
+  const dots = document.createElement('div');
+  dots.className = 'progress-dots';
+  level.challenges.forEach((_, i) => {
+    let cls = 'progress-dot';
+    if (i < challengeIdx) cls += ' done';
+    else if (i === challengeIdx) cls += ' active';
+    dots.innerHTML += `<div class="${cls}"></div>`;
+  });
+  content.appendChild(dots);
+
+  // Streak banner
+  if (state.streak >= 3) {
+    const sb = document.createElement('div');
+    sb.className = 'streak-banner show';
+    sb.innerHTML = `🔥 ${state.streak}× STREAK! Multiplier: ×${state.multiplier}`;
+    content.appendChild(sb);
+  }
+
+  // Challenge card
+  const card = document.createElement('div');
+  card.className = 'challenge-card';
+  card.id = 'challenge-card';
+
+  const xpLabel = challenge.xp * state.multiplier;
+  card.innerHTML = `
+    <div class="challenge-meta">
+      <span class="challenge-type">${challenge.typeLabel}</span>
+      <span class="challenge-num">Challenge ${challengeIdx + 1} of ${level.challenges.length}</span>
+      <span class="challenge-xp">+${xpLabel} XP</span>
+    </div>
+    <div class="challenge-q">${challenge.question}</div>
+  `;
+
+  if (challenge.type === 'mcq') {
+    const grid = document.createElement('div');
+    grid.className = 'options-grid';
+    const letters = ['A', 'B', 'C', 'D'];
+    challenge.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.setAttribute('data-idx', i);
+      btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
+      btn.onclick = () => handleMCQ(levelIdx, challengeIdx, i, btn, grid);
+      grid.appendChild(btn);
+    });
+    card.appendChild(grid);
+  } else if (challenge.type === 'fill') {
+    const fillContainer = document.createElement('div');
+    fillContainer.className = 'fill-container';
+    fillContainer.innerHTML = `
+      <div class="terminal-prompt">
+        <span class="terminal-prompt-prefix">$</span>
+        <span class="terminal-prompt-suffix">${challenge.prefix}</span>
+        <input type="text" class="fill-input" id="fill-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="...">
+        <span class="terminal-prompt-suffix">${challenge.suffix}</span>
+      </div>
+    `;
+    card.appendChild(fillContainer);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.marginTop = '12px';
+    const submitBtn = document.createElement('button');
+    submitBtn.className = 'btn-submit';
+    submitBtn.textContent = 'SUBMIT ↵';
+    submitBtn.id = 'fill-submit';
+    submitBtn.onclick = () => handleFill(levelIdx, challengeIdx);
+    btnRow.appendChild(submitBtn);
+    card.appendChild(btnRow);
+
+    setTimeout(() => {
+      const inp = document.getElementById('fill-input');
+      if (inp) {
+        inp.focus();
+        inp.addEventListener('keydown', e => {
+          if (e.key === 'Enter') handleFill(levelIdx, challengeIdx);
+        });
+      }
+    }, 100);
+  }
+
+  // Feedback placeholder
+  const fb = document.createElement('div');
+  fb.className = 'feedback-banner';
+  fb.id = 'feedback';
+  card.appendChild(fb);
+
+  content.appendChild(card);
+
+  // Next button
+  const btnWrap = document.createElement('div');
+  btnWrap.style.textAlign = 'center';
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'btn-next';
+  nextBtn.id = 'btn-next';
+  nextBtn.innerHTML = challengeIdx < level.challenges.length - 1 ? 'NEXT CHALLENGE ▶' : 'COMPLETE LAYER ▶';
+  nextBtn.onclick = () => advanceChallenge(levelIdx, challengeIdx);
+  btnWrap.appendChild(nextBtn);
+  content.appendChild(btnWrap);
+}
+
+// ── ANSWER HANDLING ──
+
+function handleMCQ(levelIdx, challengeIdx, selectedIdx, btn, grid) {
+  const challenge = LEVELS[levelIdx].challenges[challengeIdx];
+  const correct = selectedIdx === challenge.answer;
+  const allBtns = grid.querySelectorAll('.option-btn');
+
+  allBtns.forEach(b => b.disabled = true);
+
+  if (correct) {
+    btn.classList.add('correct');
+    onCorrect(levelIdx, challengeIdx, btn);
+  } else {
+    btn.classList.add('wrong');
+    // Reveal correct answer
+    allBtns[challenge.answer].classList.add('reveal-correct');
+    onWrong(levelIdx, challengeIdx, btn);
+  }
+
+  showFeedback(correct, challenge.feedback, correct ? challenge.xp * state.multiplier : 0);
+}
+
+function handleFill(levelIdx, challengeIdx) {
+  const challenge = LEVELS[levelIdx].challenges[challengeIdx];
+  const inp = document.getElementById('fill-input');
+  const submitBtn = document.getElementById('fill-submit');
+  if (!inp || inp.disabled) return;
+
+  const val = inp.value.trim().toLowerCase();
+  const correctVal = challenge.answer.toLowerCase();
+  const correct = val === correctVal;
+
+  inp.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
+
+  if (correct) {
+    inp.classList.add('correct-input');
+    onCorrect(levelIdx, challengeIdx, inp);
+  } else {
+    inp.classList.add('wrong-input');
+    onWrong(levelIdx, challengeIdx, inp);
+  }
+
+  showFeedback(correct, challenge.feedback, correct ? challenge.xp * state.multiplier : 0);
+}
+
+function onCorrect(levelIdx, challengeIdx, el) {
+  const challenge = LEVELS[levelIdx].challenges[challengeIdx];
+  const xpGained = challenge.xp * state.multiplier;
+
+  state.xp += xpGained;
+  state.score += xpGained * 10;
+  state.streak++;
+  state.totalCorrect++;
+
+  // Update multiplier
+  if (state.streak >= 5) state.multiplier = 3;
+  else if (state.streak >= 3) state.multiplier = 2;
+  else state.multiplier = 1;
+
+  updateHUD();
+  floatXP(el, `+${xpGained} XP`);
+  spawnParticles(el, '#00ff88');
+
+  // Achievements
+  if (state.totalCorrect === 1) unlockAchievement('first_blood');
+  if (state.streak === 3) unlockAchievement('streak_3');
+  if (state.streak >= 5) unlockAchievement('streak_5');
+  if (state.streak >= 5) unlockAchievement('speed_demon');
+
+  saveState();
+  showNextBtn();
+}
+
+function onWrong(levelIdx, challengeIdx, el) {
+  if (state.lives > 0) {
+    state.lives--;
+    state.livesLostThisLevel++;
+  }
+  state.streak = 0;
+  state.multiplier = 1;
+  state.totalWrong++;
+
+  updateHearts();
+  updateHUD();
+  pulseHeart();
+  spawnParticles(el, '#ff3366');
+  saveState();
+  showNextBtn();
+}
+
+function showFeedback(correct, feedback, xpGained) {
+  const fb = document.getElementById('feedback');
+  if (!fb) return;
+  fb.className = 'feedback-banner show ' + (correct ? 'correct-fb' : 'wrong-fb');
+  fb.innerHTML = `<span class="feedback-icon">${correct ? '✓' : '✗'}</span> ${correct ? feedback.correct : feedback.wrong}`;
+}
+
+function showNextBtn() {
+  const btn = document.getElementById('btn-next');
+  if (btn) btn.classList.add('show');
+}
+
+function advanceChallenge(levelIdx, challengeIdx) {
+  const level = LEVELS[levelIdx];
+  if (challengeIdx < level.challenges.length - 1) {
+    state.currentChallenge = challengeIdx + 1;
+    showChallenge(levelIdx, challengeIdx + 1);
+  } else {
+    showLevelComplete(levelIdx);
+  }
+}
+
+// ── LEVEL COMPLETE ──
+
+function showLevelComplete(levelIdx) {
+  const level = LEVELS[levelIdx];
+  state.currentLevel = levelIdx;
+
+  // Calculate level XP
+  const levelXpSum = level.challenges.reduce((s, c) => s + c.xp, 0);
+  state.levelXp[levelIdx] = levelXpSum;
+
+  showScreen('screen-level-complete');
+
+  const asciiIdx = levelIdx % LEVEL_COMPLETE_ASCII.length;
+  document.getElementById('lc-ascii').textContent = LEVEL_COMPLETE_ASCII[asciiIdx];
+  document.getElementById('lc-title').textContent = `LAYER ${levelIdx + 1} COMPLETE`;
+  document.getElementById('lc-sub').textContent = `${level.icon} ${level.name} — ${level.subtitle}`;
+  document.getElementById('lc-xp').textContent = `+${levelXpSum} XP EARNED`;
+
+  // Achievements
+  if (levelIdx === 3) unlockAchievement('halfway');
+  if (levelIdx === 6) unlockAchievement('layer7');
+  if (state.totalWrong === 0 && levelIdx === 6) unlockAchievement('all_correct');
+  if (state.livesLostThisLevel === 0 && levelIdx === 0) unlockAchievement('no_mistakes_l1');
+
+  // Badges display
+  renderBadges();
+
+  const continueBtn = document.getElementById('btn-continue');
+  if (levelIdx >= LEVELS.length - 1) {
+    continueBtn.textContent = 'VIEW RESULTS 🏆';
+  } else {
+    continueBtn.textContent = `LAYER ${levelIdx + 2}: ${LEVELS[levelIdx + 1].name.toUpperCase()} ▶`;
+  }
+
+  saveState();
+}
+
+function continueGame() {
+  if (state.currentLevel >= LEVELS.length - 1) {
+    showFinalScreen();
+  } else {
+    state.currentLevel++;
+    state.lives = Math.min(state.lives + 1, 3); // Restore 1 life between levels
+    showScreen('screen-game');
+    showBriefing(state.currentLevel);
+    updateHUD();
+  }
+}
+
+function renderBadges() {
+  const container = document.getElementById('lc-badges');
+  container.innerHTML = '';
+  ACHIEVEMENTS.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'badge' + (state.achievements.has(a.id) ? ' earned' : '');
+    div.innerHTML = `
+      <span class="badge-icon">${a.icon}</span>
+      <span class="badge-name">${a.name}</span>
+    `;
+    div.title = a.desc;
+    container.appendChild(div);
+  });
+}
+
+// ── FINAL SCREEN ──
+
+function showFinalScreen() {
+  showScreen('screen-final');
+  document.getElementById('hud').style.display = 'none';
+
+  const rank = getRank(state.xp);
+  const accuracy = state.totalCorrect + state.totalWrong > 0
+    ? Math.round((state.totalCorrect / (state.totalCorrect + state.totalWrong)) * 100)
+    : 0;
+
+  const content = document.getElementById('final-content');
+  content.innerHTML = `
+    <div class="level-complete-ascii" style="font-size: clamp(5px, 0.9vw, 9px); margin-bottom: 20px;">${FINAL_ASCII}</div>
+
+    <div class="final-rank" style="color:${rank.color}">${rank.name.toUpperCase()}</div>
+    <div class="final-title">QUEST COMPLETE</div>
+
+    <div class="final-stats-grid">
+      <div class="final-stat-card">
+        <div class="final-stat-val" style="color:var(--yellow)">${state.xp}</div>
+        <div class="final-stat-label">Total XP</div>
+      </div>
+      <div class="final-stat-card">
+        <div class="final-stat-val" style="color:var(--green)">${accuracy}%</div>
+        <div class="final-stat-label">Accuracy</div>
+      </div>
+      <div class="final-stat-card">
+        <div class="final-stat-val" style="color:var(--cyan)">${state.totalCorrect}</div>
+        <div class="final-stat-label">Correct</div>
+      </div>
+      <div class="final-stat-card">
+        <div class="final-stat-val" style="color:var(--purple)">${state.achievements.size}</div>
+        <div class="final-stat-label">Achievements</div>
+      </div>
+    </div>
+
+    <div class="certificate-box">
+      <div class="cert-title">Certificate of Completion</div>
+      <div class="cert-name">CLAUDE CODE: THE TERMINAL QUEST</div>
+      <div class="neon-divider"></div>
+      <div class="cert-body">
+        This certifies mastery of all 7 layers of Claude Code:<br>
+        Foundation · Core Workflows · Slash Commands · CLAUDE.md<br>
+        Automation · MCP & Integrations · Power User Patterns<br><br>
+        <span style="color:${rank.color}; font-weight:700">Rank Achieved: ${rank.name}</span><br>
+        XP Earned: ${state.xp} / ${MAX_XP} · Accuracy: ${accuracy}%
+      </div>
+    </div>
+
+    <div class="badges-row" id="final-badges"></div>
+
+    <div class="neon-divider"></div>
+
+    <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:16px">
+      <button class="btn-share" onclick="shareScore()">📋 COPY SCORE CARD</button>
+      <span class="copied-msg" id="copied-msg">Copied to clipboard!</span>
+      <button class="btn-restart" onclick="restartGame()">↺ PLAY AGAIN</button>
+    </div>
+
+    <div style="margin-top:32px; text-align:center">
+      <div class="terminal-block" style="display:inline-block; text-align:left; min-width:280px">
+        <span class="t-prompt">$</span> <span class="t-cmd">cd ~/my-project</span><br>
+        <span class="t-prompt">$</span> <span class="t-cmd">claude</span><br>
+        <span class="t-output">> Welcome to Claude Code!</span><br>
+        <span class="t-output">> How can I help you today?</span><br>
+        <span class="t-comment"># You're ready. Go build something. ▌</span>
+      </div>
+    </div>
+  `;
+
+  // Render final badges
+  const badges = document.getElementById('final-badges');
+  ACHIEVEMENTS.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'badge' + (state.achievements.has(a.id) ? ' earned' : '');
+    div.innerHTML = `
+      <span class="badge-icon">${a.icon}</span>
+      <span class="badge-name">${a.name}</span>
+    `;
+    div.title = a.desc;
+    badges.appendChild(div);
+  });
+
+  clearState();
+}
+
+function getRank(xp) {
+  let rank = RANKS[0];
+  for (const r of RANKS) {
+    if (xp >= r.min) rank = r;
+  }
+  return rank;
+}
+
+function shareScore() {
+  const rank = getRank(state.xp);
+  const accuracy = state.totalCorrect + state.totalWrong > 0
+    ? Math.round((state.totalCorrect / (state.totalCorrect + state.totalWrong)) * 100)
+    : 0;
+
+  const text = `🤖 CLAUDE CODE: THE TERMINAL QUEST\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🏆 Rank: ${rank.name}\n` +
+    `⬡  XP: ${state.xp} / ${MAX_XP}\n` +
+    `✓  Accuracy: ${accuracy}%\n` +
+    `⚡ Correct: ${state.totalCorrect} / ${state.totalCorrect + state.totalWrong}\n` +
+    `🎖  Achievements: ${state.achievements.size} / ${ACHIEVEMENTS.length}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Earned: ${[...state.achievements].map(id => ACHIEVEMENTS.find(a => a.id === id)?.name).filter(Boolean).join(' · ') || 'None'}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Play at: Claude Code Terminal Quest`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    const msg = document.getElementById('copied-msg');
+    msg.classList.add('show');
+    setTimeout(() => msg.classList.remove('show'), 2500);
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const msg = document.getElementById('copied-msg');
+    msg.classList.add('show');
+    setTimeout(() => msg.classList.remove('show'), 2500);
+  });
+}
+
+function restartGame() {
+  clearState();
+  resetState();
+  document.getElementById('hud').style.display = 'none';
+  showScreen('screen-title');
+  document.getElementById('save-hint').textContent = '';
+}
+
+// ═══════════════════════════════════════════════════════
+//  HUD
+// ═══════════════════════════════════════════════════════
+
+function updateHUD() {
+  document.getElementById('xp-current').textContent = state.xp;
+  document.getElementById('xp-max').textContent = MAX_XP;
+  const pct = Math.min((state.xp / MAX_XP) * 100, 100);
+  document.getElementById('xp-bar').style.width = pct + '%';
+  document.getElementById('hud-score').textContent = state.score.toLocaleString();
+  document.getElementById('hud-multiplier').textContent = `×${state.multiplier}`;
+  updateHearts();
+}
+
+function updateHUDLevel(level) {
+  document.getElementById('hud-level').textContent = `L${level.id} · ${level.name.toUpperCase()}`;
+}
+
+function updateHearts() {
+  for (let i = 1; i <= 3; i++) {
+    const h = document.getElementById(`heart-${i}`);
+    if (i <= state.lives) {
+      h.classList.remove('lost');
+    } else {
+      h.classList.add('lost');
+    }
+  }
+}
+
+function pulseHeart() {
+  for (let i = 3; i >= 1; i--) {
+    const h = document.getElementById(`heart-${i}`);
+    if (h && h.classList.contains('lost')) continue;
+    h.classList.add('pulse');
+    setTimeout(() => h.classList.remove('pulse'), 400);
+    break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  VISUAL EFFECTS
+// ═══════════════════════════════════════════════════════
+
+function floatXP(el, text) {
+  const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : { top: 300, left: 300, width: 100 };
+  const div = document.createElement('div');
+  div.className = 'xp-float';
+  div.textContent = text;
+  div.style.left = (rect.left + rect.width / 2 - 30) + 'px';
+  div.style.top = (rect.top + window.scrollY - 20) + 'px';
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 1200);
+}
+
+function spawnParticles(el, color) {
+  const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : { top: 300, left: 300, width: 100, height: 30 };
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (i / 12) * Math.PI * 2;
+    const dist = 40 + Math.random() * 60;
+    p.style.cssText = `
+      left: ${cx}px; top: ${cy + window.scrollY}px;
+      background: ${color};
+      --tx: ${Math.cos(angle) * dist}px;
+      --ty: ${Math.sin(angle) * dist}px;
+      --dur: ${0.5 + Math.random() * 0.5}s;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1000);
+  }
+}
+
+function unlockAchievement(id) {
+  if (state.achievements.has(id)) return;
+  state.achievements.add(id);
+
+  const a = ACHIEVEMENTS.find(x => x.id === id);
+  if (!a) return;
+
+  document.getElementById('achievement-icon').textContent = a.icon;
+  document.getElementById('achievement-name').textContent = a.name;
+
+  const toast = document.getElementById('achievement-toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
